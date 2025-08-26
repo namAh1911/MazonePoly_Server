@@ -1,6 +1,8 @@
 const Order = require('../models/Order');
 const User = require('../models/User');
 const Product = require('../models/Product');
+const Notification = require("../models/Notification");
+
 
 exports.createCashOrder = async (req, res) => {
   try {
@@ -178,19 +180,24 @@ exports.updateOrderStatus = async (req, res) => {
     await order.save();
 
     // Gửi WebSocket cập nhật
-    const connectedUsers = req.app.get("connectedUsers");
     const io = req.app.get("io");
-
-    if (connectedUsers && io) {
-      const socketId = connectedUsers.get(order.user_id.toString());
-      if (socketId) {
-        io.to(socketId).emit("orderStatusUpdated", {
-          orderId: order._id,
-          newStatus: order.status,
-          updatedAt: order.updatedAt,
-        });
-      }
+    if (io) {
+      io.to(order.user_id.toString()).emit("orderStatusUpdated", {
+        orderId: order._id,
+        newStatus: order.status,
+        updatedAt: order.updatedAt,
+      });
     }
+    await Notification.create({
+      user_id: order.user_id,
+      type: "order",
+      title: "Cập nhật đơn hàng",
+      message: `Đơn hàng #${order._id.toString().slice(-6)} đã chuyển sang trạng thái: ${order.status}`,
+      order_id: order._id,
+      image: order.items[0]?.image || null,
+      productName: order.items[0]?.name || "",
+      read: false,
+    });
 
     res.status(200).json({
       message: "Cập nhật trạng thái đơn hàng thành công.",
@@ -212,7 +219,7 @@ exports.getAllOrders = async (req, res) => {
     const filter = {};
 
     // Lọc theo status nếu có
-    if (status && ['pending','confirmed', 'processing', 'shipping', 'delivered', 'cancelled'].includes(status)) {
+    if (status && ['pending', 'confirmed', 'processing', 'shipping', 'delivered', 'cancelled'].includes(status)) {
       filter.status = status;
     }
 
@@ -293,18 +300,26 @@ exports.cancelOrder = async (req, res) => {
     await order.save();
 
     // ===== Gửi event realtime nếu có =====
-    const io = req.app.get('io');
-    const connectedUsers = req.app.get("connectedUsers");
-    if (io && connectedUsers && connectedUsers instanceof Map) {
-      const socketId = connectedUsers.get(order.user_id.toString());
-      if (socketId) {
-        io.to(socketId).emit("orderStatusUpdated", {
-          orderId: order._id,
-          newStatus: order.status,
-          updatedAt: order.updatedAt,
-        });
-      }
+    const io = req.app.get("io");
+    if (io) {
+      io.to(order.user_id.toString()).emit("orderStatusUpdated", {
+        orderId: order._id,
+        newStatus: order.status,
+        updatedAt: order.updatedAt,
+      });
     }
+    await Notification.create({
+      user_id: order.user_id,
+      type: "order",
+      title: "Cập nhật đơn hàng",
+      message: `Đơn hàng #${order._id.toString().slice(-6)} đã bị hủy.`,
+      order_id: order._id,
+      image: order.items[0]?.image || null, // lấy ảnh sản phẩm đầu tiên
+      productName: order.items[0]?.name || "",
+      read: false,
+    });
+
+
 
     res.status(200).json({
       message: 'Đơn hàng đã được hủy.',

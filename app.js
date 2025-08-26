@@ -8,6 +8,7 @@ const connectDB = require("./config/db");
 const addressRoutes = require('./routes/address.route');
 const orderRoutes = require("./routes/order.routes");
 const statisticsRoutes = require('./routes/statistics.routes');
+const notificationRoutes = require("./routes/notification.routes");
 
 // Kết nối MongoDB
 connectDB();
@@ -71,4 +72,5 @@ app.use('/api/addresses', addressRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payments", require("./routes/payment.routes"));
 app.use('/api/admin/statistics', statisticsRoutes);
+app.use("/api/notifications", notificationRoutes);
 module.exports = app;

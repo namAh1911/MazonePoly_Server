@@ -33,12 +33,12 @@ const Users = new Schema({
   },
 
 
-  shipping_phone_number: {
-    type: String,
-    default: function () {
-      return this.phone_number || '';
-    }
-  },
+  // shipping_phone_number: {
+  //   type: String,
+  //   default: function () {
+  //     return this.phone_number || '';
+  //   }
+  // },
 
   is_phone_verified: { type: Boolean, default: false },
 

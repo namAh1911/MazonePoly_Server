@@ -408,22 +408,22 @@ exports.getRelatedProductsByCategory = async (req, res) => {
   }
 };
 
-//Nhập hàng
+// Nhập hàng
 exports.restockProduct = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // payload chấp nhận 1 trong 2 kiểu:
-    // 1) items: [{ color, size, quantity }]  (áp dụng cho SP có variations)
-    // 2) quantity: number                    (chỉ dùng cho SP KHÔNG có variations)
-    // allowNew: cho phép thêm biến thể mới khi chưa tồn tại (mặc định false)
-    const { items, quantity, allowNew = false } = req.body;
+    // payload chấp nhận:
+    // 1) items: [{ color, size, quantity }] (cho SP có variations)
+    // 2) quantity: number (cho SP KHÔNG có variations)
+    // allowNew: cho phép thêm biến thể mới
+    const { items, quantity, allowNew = false, import_price } = req.body;  // ✅ thêm import_price
 
     const product = await Product.findById(id);
     if (!product) return res.status(404).json({ message: "Sản phẩm không tồn tại." });
 
-     // Nếu có gửi import_price mới → cập nhật
-    if (import_price) {
+    // Nếu có gửi import_price mới → cập nhật
+    if (import_price !== undefined) {   // kiểm tra đúng cách
       const newImportPrice = Number(import_price);
       if (!isNaN(newImportPrice) && newImportPrice > 0) {
         product.import_price = newImportPrice;
@@ -432,7 +432,7 @@ exports.restockProduct = async (req, res) => {
       }
     }
 
-    // Nếu có variations thì BẮT BUỘC dùng 'items' để đảm bảo tổng khớp variations
+    // ===== phần xử lý variations hoặc quantity =====
     const hasVariations = Array.isArray(product.variations) && product.variations.length > 0;
 
     if (hasVariations) {
@@ -442,7 +442,6 @@ exports.restockProduct = async (req, res) => {
         });
       }
 
-      // cập nhật theo từng item
       for (const it of items) {
         const addQty = Number(it.quantity);
         if (!it.color || !it.size || !Number.isFinite(addQty) || addQty <= 0) {
@@ -468,10 +467,8 @@ exports.restockProduct = async (req, res) => {
         }
       }
 
-      // tính lại tổng tồn kho từ variations
       product.quantity = product.variations.reduce((s, v) => s + Number(v.quantity || 0), 0);
     } else {
-      // SP không có variations: cho phép nhập nhanh theo 'quantity'
       const addQty = Number(quantity);
       if (!Number.isFinite(addQty) || addQty <= 0) {
         return res.status(400).json({
@@ -481,7 +478,6 @@ exports.restockProduct = async (req, res) => {
       product.quantity = Number(product.quantity || 0) + addQty;
     }
 
-    // Cập nhật status tự động NẾU không phải admin đã set "Ngừng bán"
     if (product.status !== "Ngừng bán") {
       product.status = product.quantity > 0 ? "Đang bán" : "Hết hàng";
     }
@@ -493,3 +489,4 @@ exports.restockProduct = async (req, res) => {
     return res.status(500).json({ message: "Không thể nhập hàng." });
   }
 };
+
