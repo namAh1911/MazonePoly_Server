@@ -5,11 +5,12 @@ const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const cloudinary = require("cloudinary").v2;
 
 const isProduction = process.env.NODE_ENV === "production";
+const useCloudinary = process.env.USE_CLOUDINARY === "true"; // ép dùng Cloudinary cả khi local
 
 let storage;
 
-if (isProduction) {
-  // Cloudinary config (Render/Vercel)
+if (isProduction || useCloudinary) {
+  // Cloudinary config
   cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -26,7 +27,6 @@ if (isProduction) {
   });
 } else {
   // Local upload (to /tmp/uploads)
-  // Sửa lại cho trùng với path static bạn dùng ở app.js
   const uploadDir = path.join(__dirname, "..", "tmp", "uploads");
 
   if (!fs.existsSync(uploadDir)) {
@@ -50,7 +50,7 @@ const fileFilter = (req, file, cb) => {
   const mimeType = allowedTypes.test(file.mimetype);
   const extname = allowedTypes.test(ext);
   if (mimeType && extname) return cb(null, true);
-  cb(new Error(" Chỉ chấp nhận ảnh jpeg, jpg, png, gif, webp"));
+  cb(new Error("Chỉ chấp nhận ảnh jpeg, jpg, png, gif, webp"));
 };
 
 const upload = multer({ storage, fileFilter });

@@ -1,18 +1,19 @@
 const express = require("express");
 const router = express.Router();
-const upload = require("../middleware/upload"); // đã xử lý phân biệt Cloudinary & Local
+const upload = require("../middleware/upload"); // đã sửa để phân biệt Cloudinary & Local
 const User = require("../models/User");
 const authMiddleware = require("../middleware/authMiddleware");
 
 const isProduction = process.env.NODE_ENV === "production";
+const useCloudinary = process.env.USE_CLOUDINARY === "true"; // thêm flag
 const serverURL = process.env.SERVER_URL || "http://localhost:5000";
 
 // Helper lấy URL phù hợp
 const getFileUrl = (file) => {
-  if (isProduction) {
-    return file.path; // Cloudinary URL
+  if (isProduction || useCloudinary) {
+    return file.path; // Cloudinary luôn trả về URL đầy đủ
   } else {
-    return `${serverURL}/uploads/${file.filename}`; // Local file URL
+    return `${serverURL}/uploads/${file.filename}`; // Local
   }
 };
 
@@ -47,7 +48,6 @@ router.post("/avatar", authMiddleware, upload.single("avatar"), async (req, res)
 
     const avatarUrl = getFileUrl(req.file);
 
-    // Cập nhật avatar_url cho user đang đăng nhập
     await User.findByIdAndUpdate(req.user.userId, { avatar_url: avatarUrl });
 
     res.status(200).json({ message: "Cập nhật avatar thành công", url: avatarUrl });

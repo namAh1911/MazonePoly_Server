@@ -182,10 +182,13 @@ exports.updateOrderStatus = async (req, res) => {
     // Gửi WebSocket cập nhật
     const io = req.app.get("io");
     if (io) {
+       console.log("📢 Emit orderStatusUpdated cho user:", order.user_id.toString());
       io.to(order.user_id.toString()).emit("orderStatusUpdated", {
         orderId: order._id,
         newStatus: order.status,
         updatedAt: order.updatedAt,
+        image: order.items[0]?.image || null,
+        productName: order.items[0]?.name || "",
       });
     }
     await Notification.create({
@@ -302,10 +305,13 @@ exports.cancelOrder = async (req, res) => {
     // ===== Gửi event realtime nếu có =====
     const io = req.app.get("io");
     if (io) {
+       console.log("📢 Emit orderStatusUpdated cho user:", order.user_id.toString());
       io.to(order.user_id.toString()).emit("orderStatusUpdated", {
         orderId: order._id,
         newStatus: order.status,
         updatedAt: order.updatedAt,
+        image: order.items[0]?.image || null,
+        productName: order.items[0]?.name || "",
       });
     }
     await Notification.create({

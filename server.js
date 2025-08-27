@@ -4,7 +4,9 @@ const app = require("./app");
 
 // Tắt cache cho toàn bộ response (fix 304)
 app.use((req, res, next) => {
-  res.set("Cache-Control", "no-store"); 
+  res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.set("Pragma", "no-cache");
+  res.set("Expires", "0");
   next();
 });
 
