@@ -60,6 +60,22 @@ const Users = new Schema({
   status: {
     type: Number,
     default: 1 // 1 = hoạt động, 0 = bị khóa
+  },
+
+  // Online status fields
+  is_online: {
+    type: Boolean,
+    default: false
+  },
+  
+  last_seen: {
+    type: Date,
+    default: Date.now
+  },
+  
+  socket_id: {
+    type: String,
+    default: null
   }
 
 }, {

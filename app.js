@@ -29,7 +29,11 @@ app.use((req, res, next) => {
 const corsOptions = {
   origin: [
     "http://localhost:3000",
+    "http://192.168.1.9:5002",
+    "http://192.168.1.2:5002",
+    "http://localhost:5002",
     "https://mazonepoly-admin.vercel.app",
+    "https://mazone-poly-admin.vercel.app",
   ],
   credentials: true,
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
@@ -73,4 +77,6 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/payments", require("./routes/payment.routes"));
 app.use('/api/admin/statistics', statisticsRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/chat", require("./routes/chat.routes"));
+app.use("/api/chat-new", require("./routes/chatNew.routes"));
 module.exports = app;
