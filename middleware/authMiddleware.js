@@ -12,9 +12,10 @@ module.exports = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Giữ nguyên userId 
+    // Set consistent user object structure
     req.user = {
-      userId: decoded.userId,
+      id: decoded.userId,        // Use 'id' for consistency with chat controller
+      userId: decoded.userId,    // Keep 'userId' for backward compatibility
       role: decoded.role,
     };
 
