@@ -40,7 +40,7 @@ const Users = new Schema({
   //   }
   // },
 
-  is_phone_verified: { type: Boolean, default: false },
+  // is_phone_verified: { type: Boolean, default: false },
 
   avatar_url: { type: String },
 

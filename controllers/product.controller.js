@@ -5,7 +5,7 @@ const mongoose = require("mongoose");
 const jwt = require('jsonwebtoken');
 const wishlistService = require('../services/wishlist.service');
 const Comment = require("../models/Comment");
-
+const Order = require("../models/Order");
 
 
 // Kiểm tra có dùng Cloudinary không
@@ -27,15 +27,23 @@ function extractPublicId(url) {
 
 exports.searchProducts = async (req, res) => {
   try {
-    const { name, category } = req.query;
+    const { name, category, sort } = req.query;
     const filter = {};
 
+    // lọc
     if (name) filter.name = { $regex: name, $options: 'i' };
     if (category) filter.category = { $regex: `^${category}$`, $options: 'i' };
 
+    // sắp xếp
+    let sortOption = { createdAt: -1 };
+    if (sort === "name_asc") sortOption = { name: 1 };
+    if (sort === "name_desc") sortOption = { name: -1 };
+    if (sort === "price_asc") sortOption = { price: 1 };
+    if (sort === "price_desc") sortOption = { price: -1 };
+
     const products = await Product.find(filter)
       .collation({ locale: 'vi', strength: 1 })
-      .sort({ createdAt: -1 });
+      .sort(sortOption);
 
     res.json(products);
   } catch (err) {
@@ -64,7 +72,7 @@ exports.getAllProducts = async (req, res) => {
       filter.name = { $regex: req.query.name, $options: 'i' }; // Tìm kiếm theo tên sản phẩm
     }
 
-     const products = await Product.aggregate([
+    const products = await Product.aggregate([
       { $match: filter },
       { $sort: { createdAt: -1 } },
       {
@@ -132,8 +140,17 @@ exports.getProductById = async (req, res) => {
       isFavorite = false;
     }
 
-    // Trả về kèm rating & isFavorite
-    return res.json({ ...product.toObject(), ratingAvg, ratingCount, isFavorite });
+    //  Kiểm tra sản phẩm có đơn hàng nào chưa
+    const hasOrder = await Order.exists({ "items.product_id": product._id });
+
+    // Trả về kèm rating, isFavorite và hasOrders
+    return res.json({
+      ...product.toObject(),
+      ratingAvg,
+      ratingCount,
+      isFavorite,
+      hasOrders: !!hasOrder, //  flag quan trọng
+    });
   } catch (err) {
     console.error("Lỗi khi lấy sản phẩm:", err);
     res.status(500).json({ message: "Lỗi server khi lấy sản phẩm" });
@@ -238,10 +255,13 @@ exports.updateProduct = async (req, res) => {
   try {
     const updateData = { ...req.body };
 
-    if (typeof req.body.is_featured !== 'undefined') {
-      updateData.is_featured = req.body.is_featured === 'true' || req.body.is_featured === true;
+    // ép kiểu boolean cho is_featured
+    if (typeof req.body.is_featured !== "undefined") {
+      updateData.is_featured =
+        req.body.is_featured === "true" || req.body.is_featured === true;
     }
-    
+
+    // validate import_price
     if (req.body.import_price) {
       const importPriceNum = Number(req.body.import_price);
       if (!importPriceNum || isNaN(importPriceNum) || importPriceNum <= 0) {
@@ -250,8 +270,7 @@ exports.updateProduct = async (req, res) => {
       updateData.import_price = importPriceNum;
     }
 
-
-    // Parse description
+    // parse description
     if (typeof updateData.description === "string") {
       try {
         updateData.description = JSON.parse(updateData.description);
@@ -260,7 +279,7 @@ exports.updateProduct = async (req, res) => {
       }
     }
 
-    // Parse variations
+    // parse variations
     if (req.body.variations) {
       try {
         const parsedVariations = JSON.parse(req.body.variations);
@@ -273,12 +292,16 @@ exports.updateProduct = async (req, res) => {
           }
         }
         updateData.variations = parsedVariations;
-        updateData.quantity = parsedVariations.reduce((sum, v) => sum + Number(v.quantity || 0), 0);
+        updateData.quantity = parsedVariations.reduce(
+          (sum, v) => sum + Number(v.quantity || 0),
+          0
+        );
       } catch {
         return res.status(400).json({ message: "Variations không hợp lệ." });
       }
     }
-    // Nếu admin không truyền status = "Ngừng bán" thì hệ thống auto tính
+
+    // cập nhật status tự động theo số lượng (trừ khi admin set "Ngừng bán")
     if (typeof updateData.quantity !== "undefined") {
       if (updateData.status !== "Ngừng bán") {
         if (updateData.quantity <= 0) {
@@ -289,11 +312,19 @@ exports.updateProduct = async (req, res) => {
       }
     }
 
-
+    // lấy sản phẩm gốc
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: "Sản phẩm không tồn tại." });
 
-    // Xử lý ảnh đại diện
+    // ❗ Check có đơn hàng nào chứa sản phẩm này không
+    const hasOrder = await Order.exists({ "items.product_id": product._id });
+    if (hasOrder) {
+      return res
+        .status(400)
+        .json({ message: "Sản phẩm này đã có đơn hàng, không thể chỉnh sửa!" });
+    }
+
+    // xử lý ảnh đại diện
     if (req.files?.image?.[0]) {
       const newImage = getImageUrl(req.files.image[0]);
       updateData.image = newImage;
@@ -312,10 +343,9 @@ exports.updateProduct = async (req, res) => {
       updateData.image = "";
     }
 
-    // Xử lý ảnh bổ sung
+    // xử lý ảnh bổ sung
     let updatedImages = product.images || [];
 
-    // Xoá ảnh cũ
     if (req.body.imagesToRemove) {
       let imagesToRemove = [];
       try {
@@ -324,7 +354,9 @@ exports.updateProduct = async (req, res) => {
         return res.status(400).json({ message: "imagesToRemove không hợp lệ." });
       }
 
-      updatedImages = updatedImages.filter((img) => !imagesToRemove.includes(img));
+      updatedImages = updatedImages.filter(
+        (img) => !imagesToRemove.includes(img)
+      );
 
       if (useCloudinary) {
         for (const imgUrl of imagesToRemove) {
@@ -338,7 +370,6 @@ exports.updateProduct = async (req, res) => {
       }
     }
 
-    // Thêm ảnh mới nếu có
     if (req.files?.images?.length > 0) {
       const newImages = req.files.images.map((file) => getImageUrl(file));
       if (req.body.imagesMode === "append") {
@@ -347,9 +378,9 @@ exports.updateProduct = async (req, res) => {
         updatedImages = newImages;
       }
     }
-
     updateData.images = updatedImages;
 
+    // update cuối cùng
     const updated = await Product.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
     });
