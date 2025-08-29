@@ -1288,7 +1288,7 @@ const closeChatSession = async (req, res) => {
 // Get all admin chats (for admin staff)
 const getAllAdminChats = async (req, res) => {
   try {
-    const { page = 1, limit = 20, status = 'active' } = req.query;
+    const { page = 1, limit = 20, status = 'all' } = req.query;
     const skip = (page - 1) * limit;
     const query = status !== 'all' ? { status } : {};
     
