@@ -521,3 +521,50 @@ exports.restockProduct = async (req, res) => {
   }
 };
 
+// Lấy sản phẩm mới nhất
+exports.getNewestProducts = async (req, res) => {
+  try {
+    const { limit = 5, category } = req.query;
+    
+    const filter = {};
+    
+    // Lọc theo category nếu có
+    if (category) {
+      filter.category = { $regex: `^${category}$`, $options: 'i' };
+    }
+    
+    // Chỉ lấy sản phẩm đang bán
+    filter.status = "Đang bán";
+    
+    const products = await Product.aggregate([
+      { $match: filter },
+      { $sort: { createdAt: -1 } }, // Sắp xếp theo ngày tạo mới nhất
+      { $limit: parseInt(limit) },
+      {
+        $lookup: {
+          from: 'comments',
+          let: { pid: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$product_id', '$$pid'] } } },
+            { $group: { _id: null, avg: { $avg: '$rating' }, count: { $sum: 1 } } },
+          ],
+          as: 'ratingDoc'
+        }
+      },
+      { $addFields: { _r: { $first: '$ratingDoc' } } },
+      {
+        $addFields: {
+          ratingAvg: { $round: [{ $ifNull: ['$_r.avg', 0] }, 1] },
+          ratingCount: { $ifNull: ['$_r.count', 0] },
+        }
+      },
+      { $project: { ratingDoc: 0, _r: 0 } },
+    ]).collation({ locale: 'vi', strength: 1 });
+
+    res.json(products);
+  } catch (error) {
+    console.error('Lỗi khi lấy sản phẩm mới nhất:', error);
+    res.status(500).json({ message: "Lỗi khi lấy sản phẩm mới nhất" });
+  }
+};
+

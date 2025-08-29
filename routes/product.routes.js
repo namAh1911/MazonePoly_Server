@@ -14,6 +14,9 @@ router.get('/search', productController.searchProducts);
 // GET - danh sách sản phẩm
 router.get("/", productController.getAllProducts);
 
+// GET - sản phẩm mới nhất
+router.get("/newest", productController.getNewestProducts);
+
 // routes/product.route.js
 router.get('/related/by-category', productController.getRelatedProductsByCategory);
 
